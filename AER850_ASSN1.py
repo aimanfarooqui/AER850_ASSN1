@@ -68,7 +68,7 @@ MSE_valid_a = computeMSE(Hypothesis_valid, Y_valid)
 print("Part (a) Training MSE:  ", MSE_train_a)
 print("Part (a) Validation MSE:", MSE_valid_a)
 
-# Making 300 evenly spaced x values across the training AND validation range, so we can draw a smooth curve 
+# Making 300 evenly spaced x values across the training AND validation range, soa smooth curve is drawn
 # (the largest validation x is past the largest training x, and that's where the fit blows up) 
 x_both = np.vstack([X_train, X_valid])
 x_plot = np.linspace(x_both.min(), x_both.max(), 300).reshape(-1, 1)
@@ -88,12 +88,20 @@ plt.title('Part (a): Degree 20 polynomial, no regularization')
 plt.legend()
 plt.show()
 
+# ---- Part (a) Comments ----
+# # The model is OVERFITTING:
+#  - It does well on the training data but terribly on the validation data.
+#  - A degree 20 polynomial is too flexible for 50 noisy points, so it follows the
+#    noise instead of the actual trend. You can see it wiggling between points and
+#    shooting up and down near x = -1 and x = 1.
+#  - Almost all of the validation error comes from one point at x = 0.996, which is
+#    just past the last training point. The curve dives to about -233 there when the
+#    real value is about 32.
+# Conclusion: bad fit. The model is too complex for this data.
+
 # %% Part (b): Degree 20 polynomial with L1 regularization (Lasso)
 # Lasso minimizes  (1/2n)*||Xm*W - Y||^2 + lambda*(|w1| + |w2| + ... + |w20|) 
-# The bias w0 is not penalized: it only shifts the curve up/down, it can't cause overfitting 
-# |w| has a sharp corner at 0, so there's no closed-form solution like least squares. 
-# Instead we use coordinate descent: update one weight at a time while holding the others 
-# fixed, and keep sweeping through all the weights until they stop changing. 
+
 def computeW_lasso(Xm_train, Y_train, lam, max_iter=100000, tol=1e-8):
     n, d = Xm_train.shape                        # n = 50 data points, d = 21 weights 
     W = np.zeros((d, 1))                         # start with all weights at 0 
@@ -176,13 +184,19 @@ plt.title('Part (b): Degree 20 polynomial with L1 regularization')
 plt.legend()
 plt.show()
 
+# ---- Part (b) Comments ----
+# Only 7 weights are not zero (powers 0, 1, 4, 5, 6, 7, 10). Everything above x^10 is zero.
+# MSE vs lambda plot:
+#  - lambda = 0 is just Part (a), so it overfits.
+#  - Small lambda (about 0.01 to 0.1) gives the lowest validation error.
+#  - Big lambda makes both errors go up because the model gets too simple (underfitting).
+# Quality of the fit: good. The curve is smooth and follows the data with no wiggles.
+# Training error went up a little compared to Part (a), but validation error dropped a lot
+# (1418 -> 8.93). Test error is close to validation error, so the model works on new data.
+# L1 sets most weights to exactly zero, so it basically removes the powers of x it
+# doesn't need.
+
 # %% Part (c): Degree 20 polynomial with L2 regularization (Ridge)
-# Ridge minimizes  (1/2n)*||Xm*W - Y||^2 + (lambda/2)*(w1^2 + w2^2 + ... + w20^2) 
-# (same scaling as Part (b) so the lambdas can be compared; bias w0 is again not penalized) 
-# Multiplying by 2n, this is least squares on a stacked system: 
-#   [ Xm            ]       [ Y ] 
-#   [ sqrt(n*lam)*D ] W  =  [ 0 ]     where D is the identity with D[0,0] = 0 (no penalty on w0) 
-# so unlike Lasso it can be solved in one step with lstsq 
 def computeW_ridge(Xm_train, Y_train, lam):
     n, d = Xm_train.shape                        # n = 50 data points, d = 21 weights 
     D = np.eye(d)
@@ -191,9 +205,7 @@ def computeW_ridge(Xm_train, Y_train, lam):
     Y_aug = np.vstack([Y_train, np.zeros((d, 1))])          # their targets are 0 
     W = np.linalg.lstsq(Xm_aug, Y_aug, rcond=None)[0]
     return W
-
-# Try lambda = 0, plus 100 values from 1e-6 to 1 spaced on a log scale. 
-# Log spacing is needed here: the best ridge lambda is ~0.0004, which a 0.01-step grid would skip over 
+ 
 lambdas_c = np.concatenate(([0], np.logspace(-6, 0, 100)))
 MSE_train_c = []
 MSE_valid_c = []
@@ -246,14 +258,17 @@ plt.title('Part (c): Degree 20 polynomial with L2 regularization')
 plt.legend()
 plt.show()
 
+# ---- Part (c) Comments ----
+# lambda was tried on a log scale because the best value is very small. Steps of 0.01
+# would have skipped right over it.
+# MSE vs lambda plot: same pattern as Part (b). Overfits at lambda = 0, works well for
+# small lambda, underfits as lambda gets close to 1.
+# Quality of the fit: good, and it looks almost the same as the L1 fit.
+# Difference from L1: L2 makes all the weights smaller but doesn't set any of them to
+# zero, so it still uses every power of x. L1 did slightly better here.
 
 # %% Part (d): Degree 20 polynomial with Elastic Net regularization
 # Elastic Net mixes the L1 and L2 penalties with a ratio r: 
-#   (1/2n)*||Xm*W - Y||^2 + lambda * [ r*(|w1| + ... + |w20|) + ((1-r)/2)*(w1^2 + ... + w20^2) ] 
-# r = 0 -> pure Ridge (Part c),  r = 1 -> pure Lasso (Part b) 
-# lambda is kept fixed at the best Lasso value from Part (b), and only r is varied. 
-# Solved with the same coordinate descent as Part (b); the only change is the update for w_j: 
-# soft-threshold by lambda*r (the L1 part), then divide by an extra lambda*(1-r) (the L2 part). 
 def computeW_elasticnet(Xm_train, Y_train, lam, r, max_iter=100000, tol=1e-8):
     n, d = Xm_train.shape                        # n = 50 data points, d = 21 weights 
     W = np.zeros((d, 1))                         # start with all weights at 0 
@@ -306,7 +321,6 @@ plt.title('Part (d): MSE vs r (degree 20, Elastic Net, lambda = %.2f)' % lambda_
 plt.legend()
 plt.show()
 
-
 # Test performance and fit at the best r
 W_d = computeW_elasticnet(Xm_train, Y_train, lambda_d, best_r)
 MSE_test_d = computeMSE(np.dot(Xm_test, W_d), Y_test)     # Xm_test was built in Part (b) 
@@ -327,10 +341,19 @@ plt.title('Part (d): Degree 20 polynomial with Elastic Net')
 plt.legend()
 plt.show()
 
+# ---- Part (d) Comments ----
+# lambda fixed at 0.03 (best from Part b), r tried from 0 to 1
+# Best r = 1.0, which is pure L1
+# Training MSE = 9.08, Validation MSE = 8.93, Test MSE = 10.28 (same as Part b)
+# MSE vs r plot: validation error goes down as r goes from 0 (all L2) to 1 (all L1).
+# This isn't just because lambda came from Part (b). Trying other lambda values also
+# gave a best r of 0.95 or 1.
+# Quality of the fit: good. Since r = 1, it's the same model as Part (b).
+# L1 wins because the real polynomial only needs a few terms. L1 can turn the extra
+# terms off completely, while L2 can only shrink them.
+
 # %% Part (e): Estimating the degree of the source polynomial
-# Fit plain least squares (no regularization) for degrees 1 to 12 and compare the errors. 
-# Too low a degree underfits (both errors high); once the degree reaches the true one, 
-# validation MSE stops improving and levels off at the noise level. 
+
 degrees = range(1, 13)
 MSE_train_e = []
 MSE_valid_e = []
@@ -370,3 +393,23 @@ plt.ylabel('y')
 plt.title('Part (e): Degree %d fit vs regularized degree 20 fit' % best_degree)
 plt.legend()
 plt.show()
+
+# ---- Part (e) Answer ----
+# The source polynomial is most likely degree 4.
+# Why:
+#  1. In the MSE vs degree plot, validation error drops a lot from degree 1 to 4
+#     (34.7 -> 9.03), then stops improving. Degree 4 has the lowest validation error.
+#  2. After degree 4, the error stays at about 9. That's the noise in the data, so no
+#     model can do better. Adding more terms after that just fits noise.
+#  3. The data is flat in the middle and then shoots up steeply near x = 1. A cubic
+#     (degree 3) can't make that shape, but adding x^4 can.
+#  4. The regularized degree 20 fits from Parts (b) to (d) look almost the same as
+#     the degree 4 fit.
+#
+# Can you tell from the plots?
+# Partly. The plots show it's a low degree (not 20) and more than 2. But degrees 4, 5
+# and 6 look almost the same on the plot, so you can't pick the exact one by eye.
+# The Lasso weights don't show it directly either, because powers like x^4 and x^6
+# look very similar between -1 and 1, so Lasso spreads the weight across them.
+# The MSE vs degree plot is what shows it. Degrees 5 and 6 score almost the same as 4,
+# so the simplest is picked: degree 4.
