@@ -326,3 +326,47 @@ plt.ylabel('y')
 plt.title('Part (d): Degree 20 polynomial with Elastic Net')
 plt.legend()
 plt.show()
+
+# %% Part (e): Estimating the degree of the source polynomial
+# Fit plain least squares (no regularization) for degrees 1 to 12 and compare the errors. 
+# Too low a degree underfits (both errors high); once the degree reaches the true one, 
+# validation MSE stops improving and levels off at the noise level. 
+degrees = range(1, 13)
+MSE_train_e = []
+MSE_valid_e = []
+for d in degrees:
+    W = computeW(getfeaturematrix(X_train, d), Y_train)
+    MSE_train_e.append(computeMSE(np.dot(getfeaturematrix(X_train, d), W), Y_train))
+    MSE_valid_e.append(computeMSE(np.dot(getfeaturematrix(X_valid, d), W), Y_valid))
+    print("Part (e) Degree %2d   Training MSE: %7.3f   Validation MSE: %7.3f" % (d, MSE_train_e[-1], MSE_valid_e[-1]))
+
+best_degree = degrees[np.argmin(MSE_valid_e)]
+print("Part (e) Degree with lowest validation MSE:", best_degree)
+
+plt.figure()
+plt.plot(degrees, MSE_train_e, 'o-', label='Training MSE')
+plt.plot(degrees, MSE_valid_e, 'o-', label='Validation MSE')
+plt.axvline(best_degree, color='k', linestyle='--', label='Best degree = %d' % best_degree)
+plt.xticks(degrees)
+plt.xlabel('Polynomial degree')
+plt.ylabel('MSE')
+plt.title('Part (e): MSE vs polynomial degree (no regularization)')
+plt.legend()
+plt.show()
+
+# Plot the best-degree fit next to the Lasso fit from Part (b) for comparison 
+W_e = computeW(getfeaturematrix(X_train, best_degree), Y_train)
+y_plot_e = np.dot(getfeaturematrix(x_plot, best_degree), W_e)
+print("Part (e) Degree %d weights (w0 ... w%d):" % (best_degree, best_degree), np.round(W_e[:, 0], 2))
+
+plt.figure()
+plt.scatter(X_train, Y_train, label='Training data')
+plt.scatter(X_valid, Y_valid, label='Validation data')
+plt.scatter(X_test, Y_test, label='Test data')
+plt.plot(x_plot, y_plot_e, 'r', label='Degree %d fit (no regularization)' % best_degree)
+plt.plot(x_plot, y_plot_b, 'k--', label='Degree 20 Lasso fit (Part b)')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Part (e): Degree %d fit vs regularized degree 20 fit' % best_degree)
+plt.legend()
+plt.show()
